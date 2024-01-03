@@ -10,31 +10,28 @@ import wget
 
 game_path_final = ""
 
+#wipes the window clean
 def clear_window(window):
     for widget in window.winfo_children():
         widget.destroy()
 
+#downloads and extracts MelonLoader into the game(if not already installed)
 def download_and_extract(destination_folder, tkwin):
-    # Download the zip file
     tkwin.destroy()
 
     response = requests.get("https://github.com/LavaGang/MelonLoader/releases/download/v0.6.1/MelonLoader.x64.zip", stream=True)
     if response.status_code == 200:
-        # Get the total size of the file
         total_size = int(response.headers.get('content-length', 0))
-        block_size = 1024  # 1 KB chunk size
+        block_size = 1024  
 
-        # Save the zip file
         zip_file_path = os.path.join(destination_folder, "MelonLoader.x64.zip")
         with open(zip_file_path, "wb") as zip_file:
-            # Create a Tkinter window for the progress bar
             progress_window = tk.Tk()
             progress_window.title("Download Progress")
             progress_window.geometry('400x300')
             
             pb = ttk.Progressbar(progress_window, orient='horizontal', mode='determinate', length=280)
             pb.pack(pady=20)
-            # Update the progress bar in the Tkinter window
             for data in response.iter_content(chunk_size=block_size):
                 zip_file.write(data)
                 downloaded_size = os.path.getsize(zip_file_path)
@@ -43,41 +40,32 @@ def download_and_extract(destination_folder, tkwin):
                 progress_window.update()
                 progress_window.update_idletasks()                
 
-            progress_window.destroy()  # Close the progress window
+            progress_window.destroy()
 
-        print("\nDownload complete.")
-        # Extract the contents
         with zipfile.ZipFile(zip_file_path, "r") as zip_ref:
             zip_ref.extractall(destination_folder)
         
-        # Clean up: Remove the downloaded zip file
         os.remove(zip_file_path)
         
-        print("Extraction complete.")
         open_mod_window()
     else:
         print(f"Failed to download the file. Status code: {response.status_code}")
         exit()
 
-
+#Creates a prompt for the GoG exe location
 def get_game_folder():
-    executable_name = "GodsOfGravity.exe"  # Replace with the actual executable name
+    executable_name = "GodsOfGravity.exe"
     file_path = filedialog.askopenfilename(initialdir="/", title="Select Game Executable", filetypes=[("Executable files", "*.exe")])
 
     if file_path:
-        # Check if the selected file has the desired executable name
         if os.path.basename(file_path) == executable_name:
             game_folder = os.path.dirname(file_path)
-            game_folder_var.set(game_folder)
-            print(f"Game folder: {game_folder}")
-            path_window.destroy()  # Close the path window
+            path_window.destroy()
             global game_path_final
             game_path_final = game_folder
             if os.path.exists(game_folder + r'\\MelonLoader'):
-                print("Melon is already installed!")
                 open_mod_window()
             else:
-                print("Installing melon")
                 window = tk.Tk()
                 window.title("Install MelonLoader")
                 window.geometry("400x300")
@@ -92,30 +80,24 @@ def get_game_folder():
         else:
             print(f"Selected file does not match the expected executable name: {executable_name}")
 
-# Create dictionaries for quick lookup (global scope)
 id_to_name = {}
 name_to_id = {}
 
+#A bit misleading, it gets all the mods that have [MelonLoader] at the start and passes them to create_mod_menu
 def open_mod_window():
-    # Use the game_folder as needed, for example, to fetch mods
-    # Use the game_folder as needed, for example, to fetch mods
     filters = modio.Filter()
     filters.like(name="[MelonLoader]*")
     mods_list = game.get_mods(filters=filters).results
 
-    # Check the structure of the Mod object
-    # Assuming that 'id' and 'name' are attributes of the Mod object
     mod_list = [{'id': mod.id, 'name': mod.name} for mod in mods_list]
 
-    # Update global dictionaries
     global id_to_name, name_to_id
     id_to_name = {mod['id']: mod['name'] for mod in mod_list}
     name_to_id = {mod['name']: mod['id'] for mod in mod_list}
 
-    # Create the mod window
     create_mod_window(mod_list)
 
-# Function to create the mod window
+#Takes the mod list and creates a button out of each
 def create_mod_window(mods):
     window = tk.Tk()
     window.title("Download Mods")
@@ -125,22 +107,18 @@ def create_mod_window(mods):
     for mod in mods:
         mod_name = str(mod["name"])
         mod_name.replace('[MelonLoader] ', '')
-        print(mod_name)
         mod_button = tk.Button(window, text=mod_name, command=lambda name=mod['name']: on_name_click(name, window))
-        mod_button.pack(pady=10, padx=5)  # Add vertical padding between buttons
+        mod_button.pack(pady=10, padx=5)
 
     window.mainloop()
 
+#Handles mod installing
 def on_name_click(mod_name, window):
     clear_window(window)
     mod_id = name_to_id.get(mod_name, "Not found")
-    print(f"Mod ID clicked for {mod_name}: {mod_id}")
     r = requests.get(f'https://g-5003.modapi.io/v1/games/5003/mods/{mod_id}/files', params={'api_key' : game_key}, headers = {'Accept' : 'application/json'})
-    #print(json.dumps(r.json(), indent=4))
     r = r.json()
     binary_url = r['data'][0]['download']['binary_url']
-    print(binary_url)
-    print(game_path_final)
     def download_mod(url, mod_path, window):
         clear_window(window)
         response = requests.get(url, stream=True)
@@ -174,27 +152,25 @@ def on_name_click(mod_name, window):
         os.remove(mod_path)
         open_mod_window()
 
-    def back_but():
+    def back_butto():
         window.destroy()
         open_mod_window()
 
     download_button = tk.Button(window, text="Download", command=lambda: download_mod(binary_url, os.path.join(game_path_final + f"\\Mods\\{mod_name}.zip"), window))
-    back_button = tk.Button(window, text="Back", command=lambda: back_but())
+    back_button = tk.Button(window, text="Back", command=lambda: back_butto())
     download_button.pack(padx=5, pady=5)
     back_button.pack(padx=5, pady=5)
 
 
-game_key = 'INSERT GAME KEY HERE '
+game_key = 'PUT API KEY HERE'
 
 client = modio.Client(api_key=game_key)
 game = client.get_game(5003)
 
-# Create the main window to get the game path
+
 path_window = tk.Tk()
 path_window.geometry("400x300")
 path_window.title("Game Path Window")
-
-game_folder_var = tk.StringVar()
 
 label = tk.Label(path_window, text="Select the game executable:")
 label.pack(pady=20)
