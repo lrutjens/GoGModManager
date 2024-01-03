@@ -2,7 +2,7 @@
 A (very bad) mod installer for gods of gravity that i wrote in a few hours
 
 
-Gods of Gravity](https://trassgames.com/projects/gods_of_gravity)
+[Gods of Gravity](https://trassgames.com/projects/gods_of_gravity)
 
 [Discord](https://discord.com/invite/v3AuK92)
 
