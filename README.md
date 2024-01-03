@@ -10,4 +10,4 @@ If you have any issue contact me (angryfool) on discord
 
 ## To run this script on your own you need to get your own API key from [Mod.io](https://mod.io/me/access)
 
-Put that API key on line 187 where it says `INSERT GAME KEY HERE`
+Put that API key on line 167 where it says `PUT API KEY HERE`
