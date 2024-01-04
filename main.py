@@ -139,11 +139,10 @@ def on_name_click(mod_name, window):
             pb = CTkProgressBar(window, mode='determinate')
             pb.pack(pady=10)
             pb.set(0)
-            if not os.path.exists(os.path.join(game_path_final, "Mods")):
-                folders = ["Mods", "Plugins", "UserLibs", "UserData"]
-                for folder in folders:
-                    if not os.path.exists(folder):
-                        os.makedirs(os.path.join(game_path_final, folder))
+            folders = ["Mods", "Plugins", "UserLibs", "UserData"]
+            for folder in folders:
+                if not os.path.exists(os.path.join(game_path_final, folder)):
+                    os.makedirs(os.path.join(game_path_final, folder))
             with open(mod_path, "wb") as file:
                 for chunk in response.iter_content(chunk_size=128):
                     file.write(chunk)
