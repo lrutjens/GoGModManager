@@ -10,11 +10,17 @@ from lxml import html
 from PIL import Image
 import io
 import sys
+import pretty_errors
+
+pretty_errors.replace_stderr()
 
 game_path_final = ""
+print("Started!")
 
 def on_closing(window):
-    window.destroy()
+    if window:
+        window.destroy()
+    CTk.quit(window)
     print("closing")
     sys.exit()
 
@@ -35,6 +41,7 @@ def download_and_extract(destination_folder, tkwin):
         zip_file_path = os.path.join(destination_folder, "MelonLoader.x64.zip")
         with open(zip_file_path, "wb") as zip_file:
             progress_window = CTk()
+            progress_window.iconbitmap(os.path.join(os.path.dirname(__file__), 'logo/logo.ico'))
             progress_window.protocol("WM_DELETE_WINDOW", lambda: on_closing(progress_window))
             progress_window.title("Download Progress")
             progress_window.geometry('400x300')
@@ -62,7 +69,7 @@ def download_and_extract(destination_folder, tkwin):
         exit()
 
 #Creates a prompt for the GoG exe location
-def get_game_folder():
+def get_game_folder(pathwin):
     executable_name = "GodsOfGravity.exe"
     file_path = filedialog.askopenfilename(initialdir="/", title="Select Game Executable", filetypes=[("Executable files", "*.exe")])
 
@@ -73,9 +80,18 @@ def get_game_folder():
             global game_path_final
             game_path_final = game_folder
             if os.path.exists(game_folder + r'\\MelonLoader'):
+                try:
+                    pathwin.quit()
+                except tk.TclError:
+                    pathwin.quit()
                 open_mod_window()
             else:
+                try:
+                    pathwin.quit()
+                except:
+                    print("")
                 window = CTk()
+                window.iconbitmap(os.path.join(os.path.dirname(__file__), 'logo/logo.ico'))
                 window.protocol("WM_DELETE_WINDOW", lambda: on_closing(window))
                 window.title("Install MelonLoader")
                 window.geometry("800x600")
@@ -94,7 +110,7 @@ def get_game_folder():
 id_to_name = {}
 name_to_id = {}
 
-#A bit misleading, it gets all the mods that have the "MelonLoader Mod" and passes them to create_mod_menu
+#A bit misleading, it gets all the mods that have the "MelonLoader Mod" tag and passes them to create_mod_menu
 def open_mod_window():
     filters = modio.Filter().values_in(tags=["MelonLoader Mod"])
     mods_list = game.get_mods(filters=filters).results
@@ -109,36 +125,43 @@ def open_mod_window():
 
 #Takes the mod list and creates a button out of each
 def create_mod_window(mods):
-    window = CTk()
-    window.protocol("WM_DELETE_WINDOW", lambda: on_closing(window))
-    window.title("Download Mods")
-    window.geometry("800x600")
-    window.resizable(False, False)
-    scroll_frame = CTkScrollableFrame(window, label_text="Download some mods!", width=800, height=800)
+    mod_window = CTk()
+    mod_window.iconbitmap(os.path.join(os.path.dirname(__file__), 'logo/logo.ico'))
+    mod_window.protocol("WM_DELETE_WINDOW", lambda: on_closing(mod_window))
+    mod_window.title("Download Mods")
+    mod_window.geometry("800x600")
+    mod_window.resizable(False, False)
+    scroll_frame = CTkScrollableFrame(mod_window, label_text="Download some mods!", width=800, height=800)
     scroll_frame.pack(pady=5, padx=5)
     for mod in mods:
         mod_name = str(mod["name"])
-        mod_button = CTkButton(scroll_frame, text=mod_name, command=lambda name=mod['name']: on_name_click(name, window))
+        mod_button = CTkButton(scroll_frame, text=mod_name, command=lambda name=mod['name']: on_name_click(name, mod_window))
         mod_button.pack(pady=5, padx=5)
-    for x in range(20):
-        CTkButton(scroll_frame, text=f"Dummy Mod {x + 1}").pack(pady=5, padx=5)
-    window.mainloop()
+    mod_window.mainloop()
 
 #Handles mod installing
 def on_name_click(mod_name, window):
     clear_window(window)
+    scroll_frame = CTkScrollableFrame(window, width=800, height=600)
+    scroll_frame.pack(pady=5, padx=5, anchor="ne")
+    back_button = CTkButton(window, text="Back", command=lambda: back_butto())
+    back_button.place(relx=0.01, rely=0.01, anchor="nw")
+    window.update()
+    window.update_idletasks()
     mod_id = name_to_id.get(mod_name, "Not found")
     r = requests.get(f'https://g-5003.modapi.io/v1/games/5003/mods/{mod_id}/files', params={'api_key' : game_key}, headers = {'Accept' : 'application/json'})
     r = r.json()
     binary_url = r['data'][0]['download']['binary_url']
     def download_mod(url, mod_path, window):
         clear_window(window)
+        window.update()
         response = requests.get(url, stream=True)
         if response.status_code == 200:
             total_size = int(response.headers.get('content-length', 0))
             pb = CTkProgressBar(window, mode='determinate')
             pb.pack(pady=10)
             pb.set(0)
+            
             folders = ["Mods", "Plugins", "UserLibs", "UserData"]
             for folder in folders:
                 if not os.path.exists(os.path.join(game_path_final, folder)):
@@ -152,6 +175,7 @@ def on_name_click(mod_name, window):
                     window.update()
                     window.update_idletasks()
             pb.set(1)
+            window.update()
         popup = CTkToplevel(window)
         window.withdraw()
         popup.title("Complete")
@@ -173,10 +197,23 @@ def on_name_click(mod_name, window):
     def back_butto():
         window.destroy()
         open_mod_window()
+    def get_mod_images(i, scroll_frame):
+        root = html.fromstring(str(i))
+        dl_link = root.get("original")
+        new_image = requests.get(dl_link)
+        new_image.raise_for_status()
+        root = io.BytesIO(new_image.content)
+        img = Image.open(root)
+        aspect_ratio = img.width/img.height
+        fixed_height = round(320 / aspect_ratio)
+        rimg = img.resize((320, fixed_height), Image.LANCZOS)
+        final_image = CTkImage(dark_image=rimg, light_image=rimg, size=(320, fixed_height))
+        img_label = CTkLabel(scroll_frame, text="", image=final_image)
+        img_label.pack(pady=5)
+        window.update()
+    
     mod = game.get_mod(mod_id)
     mod_desc = mod.description
-    scroll_frame = CTkScrollableFrame(window, width=800, height=600)
-    scroll_frame.pack(pady=5, padx=5, anchor="ne")
     mod_desc = fromstring(mod_desc).text_content()
     logo =  mod.logo.small
     response = requests.get(logo)
@@ -186,21 +223,12 @@ def on_name_click(mod_name, window):
     CTkLabel(scroll_frame, text="", image=logo_image).pack(pady=20)
     desc = CTkLabel(scroll_frame, text=mod_desc, wraplength=550)
     desc.pack(pady=20)
+    window.update()
     for i in mod.media.images:
-        root = html.fromstring(str(i))
-        dl_link = root.get("original")
-        new_image = requests.get(dl_link)
-        new_image.raise_for_status()
-        root = io.BytesIO(new_image.content)
-        final_image = CTkImage(dark_image=Image.open(root), light_image=Image.open(root), size=(320, 180))
-        img_label = CTkLabel(scroll_frame, text="", image=final_image)
-        img_label.pack(pady=5)
+       get_mod_images(i, scroll_frame)    
     download_button = CTkButton(scroll_frame, text="Download", command=lambda: download_mod(binary_url, os.path.join(game_path_final + f"/Mods/{mod_name}.zip"), window))
-    back_button = CTkButton(window, text="Back", command=lambda: back_butto())
     download_button.pack()
-    back_button.place(relx=0.01, rely=0.01, anchor="nw")
     window.mainloop()
-
 
 game_key = 'PUT API KEY HERE'
 
@@ -210,15 +238,17 @@ game = client.get_game(5003)
 set_appearance_mode("dark")
 
 path_window = CTk()
+path_window.iconbitmap(os.path.join(os.path.dirname(__file__), 'logo/logo.ico'))
+path_window._windows_set_titlebar_icon
 path_window.protocol("WM_DELETE_WINDOW", lambda: on_closing(path_window))
 path_window.geometry("400x300")
 path_window.resizable(False, False)
-path_window.title("Game Path Window")
+path_window.title("Select Game Path")
 
 label = CTkLabel(path_window, text="Select the game executable:")
 label.pack(pady=1)
 
-browse_button = CTkButton(path_window, text="Browse", command=get_game_folder)
+browse_button = CTkButton(path_window, text="Browse", command=lambda: get_game_folder(path_window))
 browse_button.pack(pady=5)
 
 path_window.mainloop()
